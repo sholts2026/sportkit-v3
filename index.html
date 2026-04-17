@@ -1,0 +1,61 @@
+// Given a Yupoo album URL, returns an array of full-size image URLs.
+
+const cache = new Map();
+const CACHE_TTL_MS = 60 * 60 * 1000;
+
+export default async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+
+  const albumUrl = req.query.u;
+  if (!albumUrl || !/^https?:\/\/[^/]*yupoo\.com\/albums\//i.test(albumUrl)) {
+    return res.status(400).send("bad album url");
+  }
+
+  const cached = cache.get(albumUrl);
+  if (cached && Date.now() - cached.t < CACHE_TTL_MS) {
+    res.setHeader("Cache-Control", "public, max-age=1800, s-maxage=3600");
+    return res.status(200).json(cached.data);
+  }
+
+  try {
+    const resp = await fetch(albumUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+    if (!resp.ok) return res.status(resp.status).send("upstream error");
+
+    const html = await resp.text();
+    const imgs = parseAlbumImages(html);
+    cache.set(albumUrl, { t: Date.now(), data: imgs });
+    res.setHeader("Cache-Control", "public, max-age=1800, s-maxage=3600");
+    return res.status(200).json(imgs);
+  } catch (e) {
+    return res.status(500).send("fetch failed: " + e.message);
+  }
+}
+
+function parseAlbumImages(html) {
+  const urls = new Set();
+  const imgTagRe = /<img[^>]+>/gi;
+  const tags = html.match(imgTagRe) || [];
+  for (const tag of tags) {
+    const attrs = ["data-origin-src", "data-src", "data-original", "src"];
+    for (const a of attrs) {
+      const m = tag.match(new RegExp(`\\s${a}="([^"]+)"`, "i"));
+      if (m) {
+        let u = m[1];
+        if (u.startsWith("//")) u = "https:" + u;
+        if (/photo\.yupoo\.com\//i.test(u)) {
+          u = u.replace(/\/(small|medium)\.(jpe?g|png|webp)/i, "/big.$2");
+          urls.add(u);
+          break;
+        }
+      }
+    }
+  }
+  return [...urls];
+}

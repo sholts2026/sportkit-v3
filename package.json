@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+    <title>SportKit — חולצות ספורט</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;600&display=swap" rel="stylesheet"/>
+    <style>
+        :root {
+            --g: #00ff41;
+            --bg: #050505;
+            --card: #111111;
+            --border: rgba(255, 255, 255, 0.08);
+            --text-main: #ffffff;
+            --text-muted: #888888;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); color: var(--text-main); font-family: 'DM Sans', sans-serif; -webkit-font-smoothing: antialiased; }
+        
+        nav { display: flex; align-items: center; justify-content: space-between; padding: 0.8rem 2rem; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; background: rgba(5, 5, 5, 0.8); backdrop-filter: blur(20px); }
+        .logo { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 2px; color: var(--g); cursor: pointer; }
+        .logo span { color: #fff; }
+        
+        .hero { padding: 5rem 2rem 3rem; text-align: center; background: radial-gradient(circle at center, #111 0%, var(--bg) 100%); }
+        .hero h1 { font-family: 'Bebas Neue', sans-serif; font-size: clamp(3rem, 8vw, 5rem); line-height: 0.9; margin-bottom: 1rem; }
+        
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; padding: 2rem; max-width: 1400px; margin: 0 auto; }
+        
+        .card { background: var(--card); border-radius: 16px; overflow: hidden; border: 1px solid var(--border); transition: all 0.4s ease; cursor: pointer; position: relative; }
+        .card:hover { transform: translateY(-8px); border-color: var(--g); box-shadow: 0 20px 40px rgba(0, 255, 65, 0.1); }
+        
+        .ib { width: 100%; aspect-ratio: 1/1; overflow: hidden; background: #1a1a1a; }
+        .ib img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s ease; }
+        .card:hover .ib img { transform: scale(1.05); }
+        
+        .pd { padding: 1.2rem; }
+        .pt { font-weight: 600; font-size: 1.1rem; margin-bottom: 0.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        #lb { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 1000; display: none; padding: 2rem; overflow-y: auto; backdrop-filter: blur(10px); }
+        #lb.open { display: block; }
+        .lb-content { max-width: 1000px; margin: 0 auto; }
+        .lb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; position: sticky; top: 0; background: rgba(0,0,0,0.5); padding: 1rem 0; z-index: 10; }
+        .lb-close { font-size: 2rem; color: #fff; cursor: pointer; background: none; border: none; }
+        .lb-grid { display: flex; flex-direction: column; gap: 20px; align-items: center; }
+        .lb-grid img { max-width: 100%; border-radius: 8px; border: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <nav><div class="logo" onclick="location.reload()">Sport<span>Kit</span></div></nav>
+    <div class="hero"><h1>CHOOSE YOUR GEAR</h1><p style="color: var(--text-muted)">האיכות הגבוהה ביותר, המחיר המשתלם ביותר</p></div>
+    <div class="grid" id="main-grid"></div>
+    <div id="lb">
+        <div class="lb-content">
+            <div class="lb-header"><h2 id="lbt"></h2><button class="lb-close" onclick="clb()">✕</button></div>
+            <div class="lb-grid" id="lbc"></div>
+        </div>
+    </div>
+    <script>
+        async function loadCatalog() {
+            const grid = document.getElementById('main-grid');
+            grid.innerHTML = '<p>טוען מוצרים...</p>';
+            try {
+                const r = await fetch('/api/catalog');
+                const items = await r.json();
+                grid.innerHTML = items.map(it => `
+                    <div class="card" onclick="ol('${it.url}', '${it.name}')">
+                        <div class="ib"><img src="/api/img?u=${encodeURIComponent(it.img)}" loading="lazy"></div>
+                        <div class="pd"><div class="pt">${it.name}</div></div>
+                    </div>
+                `).join('');
+            } catch (e) { grid.innerHTML = '<p>שגיאה בטעינה.</p>'; }
+        }
+        async function ol(u, title) {
+            const lb = document.getElementById('lb');
+            const lbc = document.getElementById('lbc');
+            document.getElementById('lbt').textContent = title;
+            lbc.innerHTML = '<p>טוען אלבום...</p>';
+            lb.classList.add('open');
+            document.body.style.overflow = 'hidden';
+            try {
+                const r = await fetch(`/api/album?u=${encodeURIComponent(u)}`);
+                const imgs = await r.json();
+                lbc.innerHTML = imgs.map(src => `<img src="/api/img?u=${encodeURIComponent(src)}" loading="lazy">`).join('');
+            } catch (e) { lbc.innerHTML = '<p>שגיאה בטעינת התמונות.</p>'; }
+        }
+        function clb() { document.getElementById('lb').classList.remove('open'); document.body.style.overflow = 'auto'; }
+        window.onload = loadCatalog;
+    </script>
+</body>
+</html>
